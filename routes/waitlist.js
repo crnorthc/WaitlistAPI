@@ -65,7 +65,9 @@ router.delete('/', (req, res) => {
         return res.status(400).json({ msg: "Please provide a user_id and wl_id" })
     }
 
-    deleteWaitlist(user_id, wl_id)
+    deleteWaitlist(user_id, wl_id).then((name) => {
+        return res.json({ msg: `${name} deleted` })
+    })
 })
 
 

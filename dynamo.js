@@ -1,4 +1,5 @@
 const { DynamoDBClient, PutItemCommand, QueryCommand, GetItemCommand, DeleteItemCommand } = require("@aws-sdk/client-dynamodb")
+const { newUID } = require("./utils")
 const AWS_config = require('./config')
 
 
@@ -287,7 +288,9 @@ const deleteUser = async function(email, wl_id, user_id) {
     updateWaitlistLength(wl_id, user_id, -1)
 }
 
+
 const deleteUsers = async function(wl_id, last_key=null) {
+    const client = new DynamoDBClient(AWS_config)
     var params = {
         TableName: 'SIGNUP',
         KeyConditionExpression: "wl_id = :k",
@@ -316,6 +319,7 @@ const deleteUsers = async function(wl_id, last_key=null) {
         return resp.LastEvaluatedKey
     })
 }
+
 
 const deleteWaitlist = async function(user_id, wl_id) {
     const client = new DynamoDBClient(AWS_config)
@@ -348,9 +352,95 @@ const deleteWaitlist = async function(user_id, wl_id) {
     // Delete Waitlist's users
     var last_key = await deleteUsers(wl_id)
     while (last_key) {
-        last_key = await deleteUsers(wl_id)
+        last_key = await deleteUsers(wl_id, last_key)
+    }
+    return waitlist.name.S
+}
+
+
+const emailExists = async function(email) {
+    const client = new DynamoDBClient(AWS_config)
+    var params = {
+        TableName: "USER",
+        Key: {
+            email: {S: email}
+        }
+    }
+
+    const command = new GetItemCommand(params)
+    client.send(command).then(resp => {
+        return resp.Item
+    })
+}
+
+
+const createUser = async function(item) { 
+    const client = new DynamoDBClient(AWS_config)
+
+    // Create USER
+    var params = {
+        TableName: "USER",
+        Item: item
+    }
+    var command = new PutItemCommand(params)
+    var response = await client.send(command)
+
+    // Create CREDENTIALS
+    const user_id = newUID(5)
+    const key = newUID(20)
+    params = {
+        TableName: "CREDENTIALS",
+        Item: {
+            email: {S: item.email.S},
+            user_id: {S: user_id},
+            key: {S: key}
+        }
+    }
+    command = new PutItemCommand(params)
+    response = await client.send(command)
+    item.user_id = {S: user_id}
+    item.key = {S: key}
+    return item
+}
+
+
+const login = async function(email, password) {
+    const client = new DynamoDBClient(AWS_config)
+
+    // Get User
+    var params = {
+        TableName: "USER",
+        Key: {
+            email: {S: email}
+        }
+    }
+    var command = new GetItemCommand(params)    
+    var response = await client.send(command)
+    var user = response.Item
+
+    // Check Password
+    if (user.password.S != password) {
+        return Promise.reject()
+    }
+
+    // Get Credentials
+    params = {
+        TableName: "CREDENTIALS",
+        Key: {
+            email: {S: email}
+        }
+    }
+    command = new GetItemCommand(params)
+    response = await client.send(command)
+    const credentials = response.Item
+    user.user_id = credentials.user_id
+    
+    return {
+        user: user,
+        key: credentials.key.S
     }
 }
+
 
 module.exports = {
     putWaitlist,
@@ -363,5 +453,8 @@ module.exports = {
     getUser,
     updateWaitlistLength,
     deleteUser,
-    deleteWaitlist
+    deleteWaitlist,
+    emailExists,
+    createUser,
+    login
 }
