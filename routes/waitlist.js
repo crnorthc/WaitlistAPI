@@ -1,26 +1,23 @@
 const express = require("express")
 const { putWaitlist, getWaitlists, addAPIKey, deleteWaitlist } = require('../dynamo')
 const { newAPIKey, newUID } = require("../utils")
+const validate_creds  = require("../middleware/auth")
 const router = express.Router()
 
 // Get User's Waitlists
-router.get('/:user_id', (req, res) => {
-    const user_id = req.params.user_id
-
-    if (!user_id) {
-        return res.status(400).json({ msg: "Please provide a user_id" })
-    }
+router.get('/', validate_creds, (req, res) => {
+    const user_id = req.body.user_id
 
     getWaitlists(user_id).then(resp => {
         return res.json({ waitlists: resp })
-    }).catch(err => {
+    }).catch(() => {
         return res.status(500).json({ msg: `Error getting waitlists for ${user_id}`})
     })
 })
 
 
 // Create New Waitlist
-router.post('/new', (req, res) => {
+router.post('/new', validate_creds, (req, res) => {
     const user_id = req.body.user_id
     const name = req.body.name
     
@@ -44,7 +41,8 @@ router.post('/new', (req, res) => {
         "ref_num": {"N": ref_num.toString()},
         "origin_urls": {"SS": origin_urls},
         "created_at": {"N": created_at.toString()},
-        "length": {"N": "0"}
+        "length": {"N": "0"},
+        "referrals" : {"N": "0"}
     }
 
     putWaitlist(item).then(() => {
@@ -56,7 +54,7 @@ router.post('/new', (req, res) => {
 
 
 // Delete Waitlist
-router.delete('/', (req, res) => {
+router.delete('/', validate_creds, (req, res) => {
     const user_id = req.body.user_id
     const wl_id = req.body.wl_id
 
@@ -72,7 +70,7 @@ router.delete('/', (req, res) => {
 
 
 // Change Waitlist name, origin_urls, and/or ref_num
-router.put('/update', (req, res) => {
+router.put('/update', validate_creds, (req, res) => {
     var waitlist = req.body.waitlist
 
     if (!waitlist) {
@@ -88,7 +86,7 @@ router.put('/update', (req, res) => {
 
 
 // New API Key
-router.put('/new-key', (req, res) => {
+router.put('/new-key', validate_creds, (req, res) => {
     var waitlist = req.body.waitlist
     var api_key = newAPIKey()
 

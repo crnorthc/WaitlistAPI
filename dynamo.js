@@ -194,7 +194,7 @@ const getSignups = (wl_id, last_key) => new Promise((myResolve, myReject) => {
 })
 
 
-const updateWaitlistLength = async function(wl_id, user_id, change) {
+const updateWaitlistLength = async function(wl_id, user_id, change, ref=false) {
     const client = new DynamoDBClient(AWS_config)
 
     // Get waitlist
@@ -209,6 +209,10 @@ const updateWaitlistLength = async function(wl_id, user_id, change) {
     const response = await client.send(command)
     var waitlist = response.Item
     waitlist.length.N = (parseInt(waitlist.length.N) + change).toString()
+
+    if (ref) {
+        waitlist.referrals.N = (parseInt(waitlist.referrals.N) + 1).toString()
+    }
 
     // Update length
     params = {
@@ -383,7 +387,7 @@ const createUser = async function(item) {
         Item: item
     }
     var command = new PutItemCommand(params)
-    var response = await client.send(command)
+    await client.send(command)
 
     // Create CREDENTIALS
     const user_id = newUID(5)
@@ -397,10 +401,20 @@ const createUser = async function(item) {
         }
     }
     command = new PutItemCommand(params)
-    response = await client.send(command)
-    item.user_id = {S: user_id}
-    item.key = {S: key}
-    return item
+    await client.send(command)
+
+    // Create AUTH
+    params = {
+        TableName: "AUTH",
+        Item: {
+            user_id: {S: user_id},
+            key: {S: key}
+        }
+    }
+    command = new PutItemCommand(params)
+    await client.send(command)
+
+    return item.email.S
 }
 
 
@@ -434,13 +448,36 @@ const login = async function(email, password) {
     response = await client.send(command)
     const credentials = response.Item
     user.user_id = credentials.user_id
-    
+    delete user.password
+
     return {
         user: user,
         key: credentials.key.S
     }
 }
 
+
+const validate = async function(key) {
+    const client = new DynamoDBClient(AWS_config)
+
+    // Get User
+    const params = {
+        TableName: "AUTH",
+        Key: {
+            key: {S: key}
+        }
+    }
+    const command = new GetItemCommand(params)    
+    const response = await client.send(command)
+    const creds = response.Item
+
+    // Check Password
+    if (!creds) {
+        return Promise.reject()
+    }
+
+    return creds.user_id.S
+}
 
 module.exports = {
     putWaitlist,
@@ -456,5 +493,6 @@ module.exports = {
     deleteWaitlist,
     emailExists,
     createUser,
-    login
+    login,
+    validate
 }

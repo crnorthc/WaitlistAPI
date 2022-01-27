@@ -14,11 +14,12 @@ const {
     validate_email,
     reference_check
 } = require('../middleware/api')
+const validate_creds = require("../middleware/auth")
 const express = require("express")
 const router = express.Router()
 
 // Get All Signups on Waitlist
-router.get('/:wl_id', (req, res) => {
+router.get('/:wl_id', validate_creds, (req, res) => {
     const wl_id = req.params.wl_id
     const last_key = req.body.last_key
     if (!wl_id) {
@@ -41,7 +42,7 @@ router.post('/new', [validate_api, validate_email, reference_check], (req, res) 
     const email = req.body.email
 
     // Update Waitlist Length
-    updateWaitlistLength(req.body.wl_id, req.body.user_id, 1).then(new_position => {
+    updateWaitlistLength(req.body.wl_id, req.body.user_id, 1, req.body.ref).then(new_position => {
         const item = {
             "wl_id": {"S": req.body.wl_id},
             "email": {"S": email},
@@ -79,7 +80,7 @@ router.get('/user/:id', validate_api, (req, res) => {
 
 
 // Delete User 
-router.delete('/', (req, res) => {
+router.delete('/', validate_creds, (req, res) => {
     const email = req.body.email
     const wl_id = req.body.wl_id
     const user_id = req.body.user_id
@@ -92,5 +93,6 @@ router.delete('/', (req, res) => {
         return res.json({ msg: `${email} deleted` })
     })
 })
+
 
 module.exports = router

@@ -1,3 +1,6 @@
+const sha256 = require("js-sha256")
+const key = require('./secrets')
+
 const KEY_COMBO = 'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz11111222223333344444555556666677777888889999900000'
 
 const new_key = () => {
@@ -47,10 +50,15 @@ const code_to_email = (code) => {
     return email
 }
 
+const handle_password = (password) => {
+    return sha256.hmac(key, password)
+}
+
 module.exports = {
     newAPIKey: new_key,
     newUID: new_uid,
     validateEmail,
     code_to_email,
-    email_to_code
+    email_to_code,
+    handle_password
 }

@@ -1,6 +1,7 @@
 const express = require("express")
 const { createUser, login } = require("../dynamo")
 const { check_email } = require("../middleware/user")
+const { handle_password } = require('../utils')
 const router = express.Router()
 
 const ML_IN_YEAR = 1000 * 60 * 60 * 24 * 365
@@ -10,7 +11,7 @@ router.post('/', check_email, (req, res) => {
     const first_name = req.body.first_name
     const last_name = req.body.last_name
     const email = req.body.email
-    const password = req.body.password
+    const password = handle_password(req.body.password)
 
     const item = {
         email: {S: email},
@@ -29,9 +30,9 @@ router.post('/', check_email, (req, res) => {
 
 // Validate User
 router.get('/', (req, res) => {    
-    const email = req.body.email
-    const password = req.body.password
-    const remember = req.body.remember
+    const email = req.query.email
+    const password = handle_password(req.query.password)
+    const remember = req.query.remember
 
     login(email, password).then(user => {
         if (remember) {
@@ -42,7 +43,7 @@ router.get('/', (req, res) => {
         }
         res.json({ user: user.user })
     }).catch(() => {
-        res.status(400).json({ msg: "invalid email or password" })
+        res.status(400).json({ msg: "Invalid email or password" })
     })
 })
 

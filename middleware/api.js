@@ -34,6 +34,7 @@ const reference_check = (req, res, next) => {
     // Reference check
     if (req.query.code) {
         handleRef(code_to_email(req.query.code), req.body.wl_id, req.body.user_id).then(() => {
+            req.body.ref = true
             next()
         }).catch(() => {
             return res.status(400).json({ msg: "Invalid ref code" })

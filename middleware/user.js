@@ -3,14 +3,14 @@ const { emailExists } = require("../dynamo")
 
 const check_email = (req, res, next) => {
     // Check email structure
-    if (!validateEmail(req.body.email)) {
-        res.status(400).json({ msg: "invalid email" })
+    if (!req.body.email || !validateEmail(req.body.email)) {
+        return res.status(400).json({ msg: "Invalid email" })
     }
 
     // Check to see if email exists
     emailExists(req.body.email).then(item => {
         if (item) {
-            res.status(400).json({ msg: "email taken" })
+            return res.status(400).json({ msg: "Email taken" })
         }
         else {
             next()
