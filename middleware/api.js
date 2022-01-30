@@ -1,4 +1,4 @@
-const { checkAPIKey, handleRef, getUser } = require('../dynamo')
+const { checkAPIKey, handleRef, getSignup } = require('../dynamo')
 const { validateEmail, code_to_email } = require('../utils')
 
 const validate_api = (req, res, next) => {
@@ -20,7 +20,7 @@ const validate_email = (req, res, next) => {
         return res.status(400).json({ msg: "Please provide a valid email" })
     }
     // Check if email is already signed up
-    getUser(email, req.body.wl_id).then(resp => {
+    getSignup(email, req.body.wl_id).then(resp => {
         if (resp) {
             return res.json({ msg: "User already signed up", user: resp})
         }

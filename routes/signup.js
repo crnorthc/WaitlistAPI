@@ -2,8 +2,8 @@ const {
     putSignup,
     getSignups,
     updateWaitlistLength,
-    getUser,
-    deleteUser
+    getSignup,
+    deleteUsers
 } = require('../dynamo')
 const {  
     email_to_code, 
@@ -21,13 +21,14 @@ const router = express.Router()
 // Get All Signups on Waitlist
 router.get('/:wl_id', validate_creds, (req, res) => {
     const wl_id = req.params.wl_id
-    const last_key = req.body.last_key
+    const last_key = req.query.last_key
+
     if (!wl_id) {
         return res.status(400).json({ msg: "Please provide a wl_id" })
     }
 
-    getSignups(wl_id, last_key).then((signups, last_key) => {
-        return res.json({ signups, last_key })
+    getSignups(wl_id, last_key).then((resp) => {
+        return res.json({ signups: resp.signups, last_key:resp.last_key })
     }).catch(() => {
         return res.status(500).json({ msg: `Error getting waitlists for ${wl_id}`})
     })
@@ -71,7 +72,7 @@ router.get('/user/:id', validate_api, (req, res) => {
         return res.status(400).json({ msg: "Please provide a id" })
     }
 
-    getUser(code_to_email(id), req.body.wl_id).then(resp => {
+    getSignup(code_to_email(id), req.body.wl_id).then(resp => {
         return res.json({ user: resp })
     }).catch(() => {
         return res.status(400).json({ msg: "No user found" })
@@ -80,17 +81,23 @@ router.get('/user/:id', validate_api, (req, res) => {
 
 
 // Delete User 
-router.delete('/', validate_creds, (req, res) => {
-    const email = req.body.email
+router.post('/delete', validate_creds, (req, res) => {
+    const emails = req.body.emails
     const wl_id = req.body.wl_id
     const user_id = req.body.user_id
 
-    if (!email || !wl_id || !user_id) {
+    if (!emails || !wl_id || !user_id) {
         return res.status(400).json({ msg: "Please provide a wl_id, user_id, and email" })
     }
 
-    deleteUser(email, wl_id, user_id).then(() => {
-        return res.json({ msg: `${email} deleted` })
+    deleteUsers(emails, wl_id, user_id).then(() => {
+        getSignups(wl_id, null).then((resp) => {
+            return res.json({ msg: 'Users Deleted', signups: resp.signups })
+        })        
+    }).catch((err) => {
+        getSignups(wl_id, null).then((resp) => {
+            return res.status(500).json({ msg: err.msg, signups: resp.signups })
+        })
     })
 })
 

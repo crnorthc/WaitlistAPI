@@ -25,7 +25,7 @@ router.post('/new', validate_creds, (req, res) => {
         return res.status(400).json({ msg: "Please provide a user_id and name" })
     }
 
-    const origin_urls = req.body.origin_urls || ['']
+    const origin_urls = req.body.origin_urls
     const ref_num = req.body.ref_num || 5
     const created_at = Date.now()
     

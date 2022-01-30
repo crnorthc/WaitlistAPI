@@ -1,6 +1,7 @@
 const { DynamoDBClient, PutItemCommand, QueryCommand, GetItemCommand, DeleteItemCommand } = require("@aws-sdk/client-dynamodb")
 const { newUID } = require("./utils")
 const AWS_config = require('./config')
+const res = require("express/lib/response")
 
 
 
@@ -187,9 +188,9 @@ const getSignups = (wl_id, last_key) => new Promise((myResolve, myReject) => {
 
     client.send(command)
     .then((resp) => {
-        myResolve(resp.Items. resp.LastEvaluatedKey)
+        myResolve({signups: resp.Items, last_key: resp.LastEvaluatedKey})
     }).catch((err) => {
-        myReject()
+        myReject(err)
     })
 })
 
@@ -225,7 +226,7 @@ const updateWaitlistLength = async function(wl_id, user_id, change, ref=false) {
 }
 
 
-const getUser = (email, wl_id) => new Promise((myResolve, myReject) => {
+const getSignup = (email, wl_id) => new Promise((myResolve, myReject) => {
     const client = new DynamoDBClient(AWS_config)
 
     var params = {
@@ -247,11 +248,20 @@ const getUser = (email, wl_id) => new Promise((myResolve, myReject) => {
 })
 
 
+const deleteUsers = async function(emails, wl_id, user_id) {
+    for (const email in emails) {
+        await deleteUser(emails[email], wl_id, user_id).catch(() => {
+            return { msg: `Error deleteing ${emails[email]}` }         
+        })
+    }
+}
+
+
 const deleteUser = async function(email, wl_id, user_id) {
     const client = new DynamoDBClient(AWS_config)
 
     // Get user 
-    const user = await getUser(email, wl_id)
+    const user = await getSignup(email, wl_id)
 
     // Update positions of users behind
     var params = {
@@ -267,14 +277,14 @@ const deleteUser = async function(email, wl_id, user_id) {
     var response = await client.send(command)
     const users = response.Items
 
-    users.forEach(user => {
+    users.forEach(async function (user){
         user.pos.N = (parseInt(user.pos.N) - 1).toString()
         params = {
             TableName: 'SIGNUP',
             Item: user
         }
         command = new PutItemCommand(params)
-        client.send(command)
+        await client.send(command)
     })
 
     // Delete User
@@ -286,14 +296,14 @@ const deleteUser = async function(email, wl_id, user_id) {
         }
     }
     command = new DeleteItemCommand(params)
-    client.send(command)
+    await client.send(command)
 
     // Update Waitlist Length
-    updateWaitlistLength(wl_id, user_id, -1)
+    await updateWaitlistLength(wl_id, user_id, -1)
 }
 
 
-const deleteUsers = async function(wl_id, last_key=null) {
+const deleteAllUsers = async function(wl_id, last_key=null) {
     const client = new DynamoDBClient(AWS_config)
     var params = {
         TableName: 'SIGNUP',
@@ -354,9 +364,9 @@ const deleteWaitlist = async function(user_id, wl_id) {
 
 
     // Delete Waitlist's users
-    var last_key = await deleteUsers(wl_id)
+    var last_key = await deleteAllUsers(wl_id)
     while (last_key) {
-        last_key = await deleteUsers(wl_id, last_key)
+        last_key = await deleteAllUsers(wl_id, last_key)
     }
     return waitlist.name.S
 }
@@ -382,6 +392,8 @@ const createUser = async function(item) {
     const client = new DynamoDBClient(AWS_config)
 
     // Create USER
+    const user_id = newUID(5)
+    item.user_id = {S: user_id}
     var params = {
         TableName: "USER",
         Item: item
@@ -390,7 +402,6 @@ const createUser = async function(item) {
     await client.send(command)
 
     // Create CREDENTIALS
-    const user_id = newUID(5)
     const key = newUID(20)
     params = {
         TableName: "CREDENTIALS",
@@ -441,9 +452,10 @@ const login = async function(email, password) {
     params = {
         TableName: "CREDENTIALS",
         Key: {
-            email: {S: email}
+            user_id: user.user_id
         }
     }
+
     command = new GetItemCommand(params)
     response = await client.send(command)
     const credentials = response.Item
@@ -460,24 +472,48 @@ const login = async function(email, password) {
 const validate = async function(key) {
     const client = new DynamoDBClient(AWS_config)
 
-    // Get User
-    const params = {
+    // Get user_id
+    var params = {
         TableName: "AUTH",
         Key: {
             key: {S: key}
         }
     }
-    const command = new GetItemCommand(params)    
-    const response = await client.send(command)
-    const creds = response.Item
+    var command = new GetItemCommand(params)    
+    var response = await client.send(command)
+    const auth = response.Item
 
     // Check Password
-    if (!creds) {
+    if (!auth) {
         return Promise.reject()
     }
 
-    return creds.user_id.S
+    // Get Credentials
+    params = {
+        TableName: "CREDENTIALS",
+        Key: {
+            user_id: auth.user_id
+        }
+    }
+    command = new GetItemCommand(params)    
+    response = await client.send(command)
+    const creds = response.Item
+
+    // Get User
+    params = {
+        TableName: "USER",
+        Key: {
+            email: creds.email
+        }
+    }
+    command = new GetItemCommand(params)    
+    response = await client.send(command)    
+    var user = response.Item
+    delete user.password
+
+    return user
 }
+
 
 module.exports = {
     putWaitlist,
@@ -487,9 +523,9 @@ module.exports = {
     checkAPIKey,
     putSignup,
     getSignups,
-    getUser,
+    getSignup,
     updateWaitlistLength,
-    deleteUser,
+    deleteUsers,
     deleteWaitlist,
     emailExists,
     createUser,

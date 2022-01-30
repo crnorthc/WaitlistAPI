@@ -1,6 +1,7 @@
 const express = require("express")
 const { createUser, login } = require("../dynamo")
 const { check_email } = require("../middleware/user")
+const validate_creds = require('../middleware/auth')
 const { handle_password } = require('../utils')
 const router = express.Router()
 
@@ -29,7 +30,7 @@ router.post('/', check_email, (req, res) => {
 
 
 // Validate User
-router.get('/', (req, res) => {    
+router.get('/login', (req, res) => {    
     const email = req.query.email
     const password = handle_password(req.query.password)
     const remember = req.query.remember
@@ -46,5 +47,12 @@ router.get('/', (req, res) => {
         res.status(400).json({ msg: "Invalid email or password" })
     })
 })
+
+
+// Get User
+router.get('/', validate_creds, (req, res) => {    
+    res.json({ user: req.body.user })
+})
+
 
 module.exports = router
