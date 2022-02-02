@@ -515,6 +515,70 @@ const validate = async function(key) {
 }
 
 
+const increaseOffboard = async function(wl_id, user_id, increase) {
+    const client = new DynamoDBClient(AWS_config)
+
+    // Get WAITLIST
+    var params = {
+        TableName: "WAITLIST",
+        Key: {
+            user_id: {S: user_id},
+            uid: {S: wl_id}
+        }
+    }
+    var command = new GetItemCommand(params)    
+    var response = await client.send(command)
+    const waitlist = response.Item
+
+    waitlist.length.N = (parseInt(waitlist.length.N) - increase).toString()
+    waitlist.offboards.N = (parseInt(waitlist.offboards.N) + increase).toString()
+
+    // Update Waitlist
+    params = {
+        TableName: "WAITLIST",
+        Item: waitlist
+    }
+    command = new PutItemCommand(params)    
+    await client.send(command)
+
+    return waitlist.offboards.N
+}
+
+
+const newOffboard = async function(item) {
+    const client = new DynamoDBClient(AWS_config)
+
+    // Get WAITLIST
+    var params = {
+        TableName: "OFFBOARD",
+        Item: item
+    }
+    var command = new PutItemCommand(params)    
+    await client.send(command)
+
+    const offboards = await getOffboards(item.wl_id)
+
+    return offboards
+}
+
+
+const getOffboards = async function(wl_id) {
+    const client = new DynamoDBClient(AWS_config)
+
+    const params = {
+        TableName: 'OFFBOARD',
+        KeyConditionExpression: "wl_id = :k",
+        ExpressionAttributeValues: {
+            ":k": wl_id
+        }
+    }
+
+    const command = new QueryCommand(params)
+    const response = await client.send(command)
+
+    return response.Items
+}
+
 module.exports = {
     putWaitlist,
     getWaitlists,
@@ -530,5 +594,7 @@ module.exports = {
     emailExists,
     createUser,
     login,
-    validate
+    validate,
+    increaseOffboard,
+    newOffboard
 }

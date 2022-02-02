@@ -3,7 +3,9 @@ const {
     getSignups,
     updateWaitlistLength,
     getSignup,
-    deleteUsers
+    deleteUsers,
+    increaseOffboard,
+    newOffboard
 } = require('../dynamo')
 const {  
     email_to_code, 
@@ -98,6 +100,39 @@ router.post('/delete', validate_creds, (req, res) => {
         getSignups(wl_id, null).then((resp) => {
             return res.status(500).json({ msg: err.msg, signups: resp.signups })
         })
+    })
+})
+
+
+// Offboard User
+router.put('/off', validate_creds, (req, res) => {        
+    const wl_id = req.body.wl_id
+    const email = req.body.email
+    const user_id = req.body.user_id
+
+    getSignup(email, wl_id).then(user => {
+        deleteUsers([email], wl_id, user_id).then(() => {                
+            increaseOffboard(wl_id, user_id, 1).then((num_offs) => {                
+                // Increase offboard number
+                const offed = Date.now()
+                user.offed = {N: offed.toString()}
+                user.og_pos = user.pos
+                delete user.pos
+                user.off_pos = {N: num_offs}
+                newOffboard(user).then(offboards => {
+                    return res.json({ msg: "Offboarded User", offboards })
+                }).catch(() => {
+                    increaseOffboard(wl_id, user_id, -1)
+                    return res.status(400).json({ msg: "Error creating offboard" })
+                })               
+            }).catch(() => {            
+                return res.status(400).json({ msg: "Error updating waitlist" })
+            })
+        }).catch(() => { 
+            return res.status(400).json({ msg: "Error deleting user" })
+        })
+    }).catch(() => {
+        return res.status(400).json({ msg: "No user found" })
     })
 })
 

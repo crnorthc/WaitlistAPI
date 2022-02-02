@@ -1,8 +1,8 @@
 const { validate } = require('../dynamo')
 
 const validate_creds = (req, res, next) => {
-    
     const creds = req.cookies.creds
+
     if (!creds) {
         return res.status(400).json({ msg: "not authenticated" })
     }

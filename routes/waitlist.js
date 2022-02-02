@@ -42,7 +42,8 @@ router.post('/new', validate_creds, (req, res) => {
         "origin_urls": {"SS": origin_urls},
         "created_at": {"N": created_at.toString()},
         "length": {"N": "0"},
-        "referrals" : {"N": "0"}
+        "referrals" : {"N": "0"},
+        "offboards": {'N': '0'}
     }
 
     putWaitlist(item).then(() => {
