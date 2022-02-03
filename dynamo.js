@@ -483,7 +483,7 @@ const validate = async function(key) {
     var response = await client.send(command)
     const auth = response.Item
 
-    // Check Password
+    // Check if user exists
     if (!auth) {
         return Promise.reject()
     }
@@ -531,7 +531,7 @@ const increaseOffboard = async function(wl_id, user_id, increase) {
     const waitlist = response.Item
 
     waitlist.length.N = (parseInt(waitlist.length.N) - increase).toString()
-    waitlist.offboards.N = (parseInt(waitlist.offboards.N) + increase).toString()
+    waitlist.off_length.N = (parseInt(waitlist.off_length.N) + increase).toString()
 
     // Update Waitlist
     params = {
@@ -541,7 +541,7 @@ const increaseOffboard = async function(wl_id, user_id, increase) {
     command = new PutItemCommand(params)    
     await client.send(command)
 
-    return waitlist.offboards.N
+    return waitlist.off_length.N
 }
 
 
@@ -564,7 +564,7 @@ const newOffboard = async function(item) {
 
 const getOffboards = async function(wl_id) {
     const client = new DynamoDBClient(AWS_config)
-
+    
     const params = {
         TableName: 'OFFBOARD',
         KeyConditionExpression: "wl_id = :k",
@@ -578,6 +578,7 @@ const getOffboards = async function(wl_id) {
 
     return response.Items
 }
+
 
 module.exports = {
     putWaitlist,
@@ -596,5 +597,6 @@ module.exports = {
     login,
     validate,
     increaseOffboard,
-    newOffboard
+    newOffboard,
+    getOffboards
 }
